@@ -1,20 +1,20 @@
 /**
  * @file SQ.Dialog 对话框组件
- * @version 0.9.3
- */
-
-/*global
- $: false,
- SQ: true,
- Zepto: true
+ * @version 0.9.8
  */
 
 /**
  * @changelog
+ * 0.9.8  * 新增 PREVENT_DEFAULT、DELAY 设置，增强 ANIMATE 参数的兼容性，可以支持 ".style-name" 或 "style-name" 写法。
+ * 0.9.7  * 修复 jshint 问题。
+ * 0.9.6  * 改写 _bin、_unbind 方法，新增 DESTROY 参数，设置 DESTROY 后会清除目标 DOM 的绑定事件。
+ * 0.9.5  * 修复 IE 兼容性问题。
+ * 0.9.4  * 调整 SQ.dom 的调用。
+ *          修复当文档内容高度小于窗口高度时，遮罩不完全的问题。
  * 0.9.3  * 更改 _bind 中的绑定方式，修正异步加载的 DOM 无法绑定 dialog 事件问题。
- * 0.9.2  * 将 _bind 中的 .live 改为 .on 绑定，添加 TXT_CLOSE_VAL 默认值为 x
+ * 0.9.2  * 将 _bind 中的 .live 改为 .on 绑定，添加 TXT_CLOSE_VAL 默认值为 x。
  * 0.9.1  * 核心删除了 SQ.dom.getHeight 方法，所以改用 .height() 方法。
- * 0.9.0  + 新增 resize 回调函数
+ * 0.9.0  + 新增 resize 回调函数，
  *        * 拆分 show 方法，新增 _initDialogStyle、_initDialogEvent 方法，
  *        * 新增 _reset 方法，当窗口发生变化时将会重新计算对话框样式，
  *        * 修复遮罩在窗口发生变化时无法铺满全屏的问题。
@@ -31,6 +31,7 @@
  */
 
 (function ($, window) {
+    "use strict";
     /**
      * @name Dialog
      * @classdesc 对话框组件，依赖 jQuery 或 Zepto 库。
@@ -62,6 +63,8 @@
      * @param {boole} config.MASK 遮罩设定，默认为 false，设为 true 将显示遮罩效果
      * @param {boole} config.LOCK 锁定操作，默认为 false，设为 true 将屏蔽触摸操作，默认值：false
      * @param {number} config.NUM_CLOSE_TIME 自动关闭对话框时间，单位：毫秒
+     * @param {boole} config.PREVENT_DEFAULT 默认动作响应设置，默认为 true，不响应默认操作
+     * @param {number} config.DELAY 延时显示对话框设置，单位：毫秒
      * @param {function} config.show 打开对话框回调函数
      * @param {function} config.ok 点击确定按钮回调函数
      * @param {function} config.cancel 点击取消按钮回调函数
@@ -87,7 +90,8 @@
             TXT_CLOSE_VAL : "×",
             ANIMATE : undefined,
             LOCK : false,
-            MASK : false
+            MASK : false,
+            PREVENT_DEFAULT : true
         };
 
         for (i in config) {
@@ -97,6 +101,10 @@
         }
 
         me.$triggerTarget = $(me.config.DOM_TRIGGER_TARGET); // 触发元素
+        me.cssStyle = me.config.CSS_STYLE.indexOf(".") === 0 ? me.config.CSS_STYLE.slice(1) : me.config.CSS_STYLE;
+        if (me.config.ANIMATE) {
+            me.animate = me.config.ANIMATE.indexOf(".") === 0 ? me.config.ANIMATE.slice(1) : me.config.ANIMATE;
+        }
 
         me.showFun = me.config.show;
         me.closeFun = me.config.close;
@@ -110,7 +118,7 @@
     }
     Dialog.prototype =  {
         construtor: Dialog,
-        version: "0.9.3",
+        version: "0.9.8",
         timer : undefined,
         resizeTimer : false,    // resize 
         closed : true,
@@ -140,7 +148,7 @@
                 me.dialogHeight = undefined;
             }
 
-            me._bind(me.$triggerTarget, me.config.EVE_EVENT_TYPE);
+            me._bind(me.config.EVE_EVENT_TYPE);
         },
 
         /**
@@ -148,10 +156,13 @@
          * @param {object} $el jQuert 或 Zepto 元素包装集。
          * @param {string} EVE_EVENT_TYPE 事件类型，"scroll" 或 "click"。
          */
-        _bind : function ($el, EVE_EVENT_TYPE) {
+        _bind : function (EVE_EVENT_TYPE) {
             var me = this;
-            SQ.dom.$el.$doc.on(EVE_EVENT_TYPE, me.config.DOM_TRIGGER_TARGET, function (e) {
-                e.preventDefault();
+            // 绑定在 document 上是为了解决 Ajax 内容绑定问题
+            SQ.dom.$doc.on(EVE_EVENT_TYPE, me.config.DOM_TRIGGER_TARGET, function (e) {
+                if (me.config.PREVENT_DEFAULT) {
+                    e.preventDefault();
+                }
                 me._trigger(e);
             });
         },
@@ -160,8 +171,10 @@
          * @param {object} $el jQuert 或 Zepto 元素包装集。
          * @param {string} EVE_EVENT_TYPE 事件类型，"scroll" 或 "click"。
          */
-        _unBind : function ($el, EVE_EVENT_TYPE) {
-            $el.off(EVE_EVENT_TYPE);
+        _unbind : function (EVE_EVENT_TYPE) {
+            var me = this;
+            SQ.dom.$doc.off(EVE_EVENT_TYPE, me.config.DOM_TRIGGER_TARGET);
+            //$el.off(EVE_EVENT_TYPE);
         },
         /**
          * 触发事件方法，在满足绑定事件条件时或满足指定触发条件的情况下调用触发方法，
@@ -170,6 +183,12 @@
          */
         _trigger : function (e) {
             var me = this;
+            if (me.config.DELAY) {
+                setTimeout(function () {
+                    me.show(e);
+                }, me.config.DELAY);
+                return;
+            }
             me.show(e);
         },
 
@@ -177,7 +196,7 @@
         _reset : function () {
             var me = this;
 
-            $(window).resize(function () {
+            SQ.dom.$win.resize(function () {
                 if (!me.closed && !me.resizeTimer) {
                     me.resizeTimer = true;
                     setTimeout(function () {
@@ -193,7 +212,10 @@
                             "height" : me.height
                         });
                         me.resizeTimer = false;
-                        me.resizeFun && me.resizeFun();
+                        if (me.resizeFun) {
+                            me.resizeFun();
+                        }
+                        //me.resizeFun && me.resizeFun();
                     }, 200);
                 }
             });
@@ -213,7 +235,7 @@
             var $cancelBtn = $("<div class='cancel'>" + me.config.TXT_CANCEL_VAL + "</div>");
             var $close = $("<div class='close-btn'>" + me.config.TXT_CLOSE_VAL + "</div>");
             $dialogWindow.append($close).append($dialogContent).append($okBtn).append($cancelBtn);
-            $dialogWindow.addClass(me.config.CSS_STYLE);
+            $dialogWindow.addClass(me.cssStyle);
             // 保存关键 Dom
             //me.$dialogWindow = $dialogWindow;
             me.$dialogContent = $dialogContent;
@@ -226,9 +248,9 @@
 
         _initDialogStyle : function () {
             var me = this;
-            var scroll = SQ.dom.$el.$body.scrollTop();
-            var winWidth = window.innerWidth;
-            var winHeight = window.innerHeight;
+            var scroll = SQ.dom.$body.scrollTop();
+            var winWidth = window.innerWidth || SQ.dom.$win.width();
+            var winHeight = window.innerHeight || SQ.dom.$win.height();
 
             // 设置 top
             if (me.dialogHeight) {
@@ -318,7 +340,7 @@
             me._initDialogStyle();
             // 添加动画
             if (me.config.ANIMATE) {
-                me.$dialogWindow.addClass("animated " + me.config.ANIMATE);
+                me.$dialogWindow.addClass("animated " + me.animate);
             }
             // 设置对话框样式
             me.$dialogWindow.css({
@@ -330,11 +352,17 @@
                 "width" : me.width,
                 "height" : me.height,
                 "z-index" : 102
-            }).appendTo(SQ.dom.$el.$body);
+            }).appendTo(SQ.dom.$body);
             // 绑定对话框事件
             me._initDialogEvent();
             // 执行回调函数
-            me.showFun && me.showFun(e);
+            if (me.showFun) {
+                me.showFun(e);
+            }
+            //me.showFun && me.showFun(e);
+            if (me.config.DESTROY) {
+                me._unbind(me.config.EVE_EVENT_TYPE);
+            }
         },
 
         /** 关闭对话框 */
@@ -347,7 +375,10 @@
                 me.$mask.hide();
             }
             me.closed = true;
-            me.closeFun && me.closeFun(e);
+            if (me.closeFun) {
+                me.closeFun(e);
+            }
+            //me.closeFun && me.closeFun(e);
         },
 
         /**
@@ -366,7 +397,9 @@
         /** 显示遮罩 */
         mask : function () {
             var me = this;
-            var h = SQ.dom.$el.$body.height();
+            var bodyH = SQ.dom.$body.height();
+            var winH = SQ.dom.$win.height();
+            var h = bodyH > winH ? bodyH : winH;
 
             if (me.$mask) {
                 me.$mask.css({
@@ -387,7 +420,7 @@
                     "background" : me.config.CSS_MASK_BACKGROUND,
                     "opacity" : me.config.CSS_MASK_OPACITY,
                     "z-index" : 101
-                }).appendTo(SQ.dom.$el.$body);
+                }).appendTo(SQ.dom.$body);
 
                 if (me.config.LOCK) {
                     $mask.on("touchstart", function (e) {
@@ -402,19 +435,25 @@
         },
 
         unlock : function () {
-            var me = this;
+            //var me = this;
         },
 
         ok : function (e) {
             var me = this;
             me.close();
-            me.okFun && me.okFun(e);
+            if (me.okFun) {
+                me.okFun(e);
+            }
+            //me.okFun && me.okFun(e);
         },
 
         cancel : function (e) {
             var me = this;
             me.close();
-            me.cancelFun && me.cancelFun(e);
+            if (me.cancelFun) {
+                me.cancelFun(e);
+            }
+            //me.cancelFun && me.cancelFun(e);
         }
     };
     SQ.Dialog = Dialog;

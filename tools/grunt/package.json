@@ -1,7 +1,7 @@
 {
     "name": "squirrel",
-    "version": "0.8.12",
-    "description": "",
+    "version": "0.8.24",
+    "description": "移动前端开发框架，让移动 Web 应用开发更加简单、迅速。",
     "dirs": {
         "base": "../..",
         "js_src": "src/js",
@@ -11,33 +11,17 @@
         "css_build": "build/css",
         "css_dist": "dist/css"
     },
-    "project": {
-        "apkx": {
-            "less": [
-                "../../src/less/core.less",
-                "../../src/less/button.less",
-                "../../src/less/form.less",
-                "../../src/less/icon.less",
-                "../../src/less/list.less",
-                "../../src/less/toolbar.less"
-            ],
-            "js": [
-                "../../src/js/core/core.js",
-                "../../src/js/core/*.js",
-                "../../src/js/dialog.js",
-                "../../src/js/loadmore.js",
-                "../../src/js/touchslip.js"
-            ]
-        }
-    },
     "devDependencies": {
-        "grunt": "~0.4.1",
+        "grunt-contrib-less": "~0.8.3",
         "grunt-contrib-concat": "~0.3.0",
-        "grunt-contrib-uglify": "~0.2.2",
-        "grunt-contrib-clean": "~0.4.0",
-        "grunt-jsdoc": "~0.4.0"
-    },
-    "dependencies": {
-        "grunt-open": "~0.2.0"
+        "grunt-contrib-uglify": "~0.2.7",
+        "grunt-contrib-cssmin": "~0.7.0",
+        "grunt-contrib-clean": "~0.5.0",
+        "grunt-contrib-watch": "~0.5.3",
+        "grunt-jsdoc": "~0.4.2",
+        "grunt-open": "~0.2.2",
+        "grunt-notify": "~0.2.16",
+        "grunt-contrib-copy": "~0.4.1",
+        "grunt-autoprefixer": "~0.5.0"
     }
 }
